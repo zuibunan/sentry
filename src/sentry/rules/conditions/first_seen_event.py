@@ -14,5 +14,5 @@ from sentry.rules.conditions.base import EventCondition
 class FirstSeenEventCondition(EventCondition):
     label = 'An event is first seen'
 
-    def passes(self, event, state):
+    def passes(self, event, state, is_active):
         return state.is_new

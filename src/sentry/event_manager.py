@@ -25,12 +25,14 @@ from sentry.constants import (
 )
 from sentry.models import Event, EventMapping, Group, GroupHash, Project
 from sentry.plugins import plugins
+from sentry.rules.helpers import apply_rule, get_matching_rules
+from sentry.rules.states import EventState
 from sentry.signals import regression_signal
-from sentry.utils.logging import suppress_exceptions
 from sentry.tasks.index import index_event
 from sentry.tasks.merge import merge_group
 from sentry.tasks.post_process import post_process_group
 from sentry.utils.db import get_db_engine
+from sentry.utils.logging import suppress_exceptions
 from sentry.utils.safe import safe_execute, trim, trim_dict
 
 
@@ -276,6 +278,7 @@ class EventManager(object):
             'time_spent_count': time_spent and 1 or 0,
         })
 
+        # TODO(dcramer): move into normalization code
         tags = data['tags']
         tags.append(('level', LOG_LEVELS[level]))
         if logger_name:
@@ -292,6 +295,13 @@ class EventManager(object):
             added_tags = safe_execute(plugin.get_tags, event)
             if added_tags:
                 tags.extend(added_tags)
+
+        # TODO(dcramer): we'd like to be able to mutate state within the rules
+        # but its complex as there's the Event object state as well as the
+        # non-event state (is_new, is_regression, etc)
+        state = EventState()
+        for rule in get_matching_rules(event, state):
+            apply_rule(rule, event, state, 'before')
 
         result = safe_execute(
             self._save_aggregate,

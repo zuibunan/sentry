@@ -8,6 +8,8 @@ sentry.rules.registry
 
 from __future__ import absolute_import
 
+__all__ = ('RuleRegistry',)
+
 from collections import defaultdict
 
 

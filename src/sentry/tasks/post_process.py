@@ -8,41 +8,14 @@ sentry.tasks.post_process
 
 from __future__ import absolute_import, print_function
 
-import logging
-
 from django.conf import settings
 from hashlib import md5
 
-from sentry.constants import STATUS_ACTIVE, STATUS_INACTIVE
 from sentry.plugins import plugins
-from sentry.rules import EventState, rules
+from sentry.rules.helpers import apply_rule, get_matching_rules
+from sentry.rules.states import EventState
 from sentry.tasks.base import instrumented_task
-from sentry.utils.cache import cache
 from sentry.utils.safe import safe_execute
-
-
-rules_logger = logging.getLogger('sentry.errors')
-
-
-def condition_matches(project, condition, event, state):
-    condition_cls = rules.get(condition['id'])
-    if condition_cls is None:
-        rules_logger.error('Unregistered condition %r', condition['id'])
-        return
-
-    condition_inst = condition_cls(project, data=condition)
-    return safe_execute(condition_inst.passes, event, state)
-
-
-def get_rules(project):
-    from sentry.models import Rule
-
-    cache_key = 'project:%d:rules' % (project.id,)
-    rules_list = cache.get(cache_key)
-    if rules_list is None:
-        rules_list = list(Rule.objects.filter(project=project))
-        cache.set(cache_key, rules_list, 60)
-    return rules_list
 
 
 @instrumented_task(
@@ -51,7 +24,7 @@ def post_process_group(event, is_new, is_regression, is_sample, **kwargs):
     """
     Fires post processing hooks for a group.
     """
-    from sentry.models import GroupRuleStatus, Project
+    from sentry.models import Project
 
     project = Project.objects.get_from_cache(id=event.group.project_id)
 
@@ -73,70 +46,26 @@ def post_process_group(event, is_new, is_regression, is_sample, **kwargs):
             expires=120,
         )
 
-    for rule in get_rules(project):
-        match = rule.data.get('action_match', 'all')
-        condition_list = rule.data.get('conditions', ())
+    state = EventState(
+        is_new=is_new,
+        is_regression=is_regression,
+        is_sample=is_sample,
+    )
 
-        if not condition_list:
-            continue
+    matching_rules = get_matching_rules(
+        event=event,
+        state=state,
+    )
 
-        # TODO(dcramer): this might not make sense for other rule actions
-        # so we should find a way to abstract this into actions
-        # TODO(dcramer): this isnt the most efficient query pattern for this
-        rule_status, _ = GroupRuleStatus.objects.get_or_create(
-            rule=rule,
-            group=event.group,
-            defaults={
-                'project': project,
-                'status': STATUS_INACTIVE,
+    for rule, state in matching_rules:
+        execute_rule.apply_async(
+            kwargs={
+                'rule_id': rule.id,
+                'event': event,
+                'state': state,
             },
+            expires=120,
         )
-
-        state = EventState(
-            is_new=is_new,
-            is_regression=is_regression,
-            is_sample=is_sample,
-            rule_is_active=rule_status.status == STATUS_ACTIVE,
-        )
-
-        condition_iter = (
-            condition_matches(project, c, event, state)
-            for c in condition_list
-        )
-
-        if match == 'all':
-            passed = all(condition_iter)
-        elif match == 'any':
-            passed = any(condition_iter)
-        elif match == 'none':
-            passed = not any(condition_iter)
-        else:
-            rules_logger.error('Unsupported action_match %r for rule %d',
-                               match, rule.id)
-            continue
-
-        if passed and rule_status.status == STATUS_INACTIVE:
-            # we only fire if we're able to say that the state has changed
-            GroupRuleStatus.objects.filter(
-                id=rule_status.id,
-                status=STATUS_INACTIVE,
-            ).update(status=STATUS_ACTIVE)
-        elif not passed and rule_status.status == STATUS_ACTIVE:
-            # update the state to suggest this rule can fire again
-            GroupRuleStatus.objects.filter(
-                id=rule_status.id,
-                status=STATUS_ACTIVE,
-            ).update(status=STATUS_INACTIVE)
-
-        if passed:
-            execute_rule.apply_async(
-                kwargs={
-                    'rule_id': rule.id,
-                    'event': event,
-                    'state': state,
-                },
-                expires=120,
-            )
 
 
 @instrumented_task(
@@ -152,14 +81,7 @@ def execute_rule(rule_id, event, state):
     event.project = project
     event.group.project = project
 
-    for action in rule.data.get('actions', ()):
-        action_cls = rules.get(action['id'])
-        if action_cls is None:
-            rules_logger.error('Unregistered action %r', action['id'])
-            continue
-
-        action_inst = action_cls(project, data=action)
-        safe_execute(action_inst.after, event=event, state=state)
+    apply_rule(rule, event, state, 'after')
 
 
 @instrumented_task(

@@ -42,11 +42,11 @@ class EventFrequencyCondition(EventCondition):
 
         super(EventFrequencyCondition, self).__init__(*args, **kwargs)
 
-    def passes(self, event, state):
+    def passes(self, event, state, is_active):
         # when a rule is not active (i.e. it hasnt gone from inactive -> active)
         # it means that we already notified the user about this condition and
         # shouldn't spam them again
-        if state.rule_is_active:
+        if is_active:
             return False
 
         interval = self.get_option('interval')

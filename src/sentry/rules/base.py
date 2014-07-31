@@ -37,6 +37,8 @@ by the rule's logic. Each rule condition may be associated with a form.
 
 from __future__ import absolute_import
 
+__all__ = ('RuleBase',)
+
 import logging
 import re
 
@@ -93,11 +95,3 @@ class RuleBase(object):
         form = self.get_form_instance()
 
         return form.is_valid()
-
-
-class EventState(object):
-    def __init__(self, is_new, is_regression, is_sample, rule_is_active):
-        self.is_new = is_new
-        self.is_regression = is_regression
-        self.is_sample = is_sample,
-        self.rule_is_active = rule_is_active

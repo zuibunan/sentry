@@ -15,7 +15,7 @@ from sentry.tasks.post_process import (
 
 class PostProcessGroupTest(TestCase):
     @patch('sentry.tasks.post_process.record_affected_code')
-    @patch('sentry.tasks.post_process.get_rules', Mock(return_value=[]))
+    @patch('sentry.rules.post_process.get_matching_rules', Mock(return_value=[]))
     def test_record_affected_code(self, mock_record_affected_code):
         group = self.create_group(project=self.project)
         event = self.create_event(group=group)
@@ -43,7 +43,7 @@ class PostProcessGroupTest(TestCase):
         )
 
     @patch('sentry.tasks.post_process.record_affected_user')
-    @patch('sentry.tasks.post_process.get_rules', Mock(return_value=[]))
+    @patch('sentry.rules.post_process.get_matching_rules', Mock(return_value=[]))
     def test_record_affected_user(self, mock_record_affected_user):
         group = self.create_group(project=self.project)
         event = self.create_event(group=group)
@@ -71,7 +71,7 @@ class PostProcessGroupTest(TestCase):
         )
 
     @patch('sentry.tasks.post_process.execute_rule')
-    @patch('sentry.tasks.post_process.get_rules')
+    @patch('sentry.rules.post_process.get_matching_rules')
     def test_execute_rule(self, mock_get_rules, mock_execute_rule):
         action_id = 'sentry.rules.actions.notify_event.NotifyEventAction'
         condition_id = 'sentry.rules.conditions.first_seen_event.FirstSeenEventCondition'
