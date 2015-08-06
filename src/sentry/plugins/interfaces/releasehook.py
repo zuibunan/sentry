@@ -10,14 +10,22 @@ from __future__ import absolute_import, print_function
 
 __all__ = ['ReleaseHook']
 
+import re
+
+from django.db import transaction
 from django.utils import timezone
 
-from sentry.models import Activity, Release
+from sentry.models import (
+    Activity, Commit, CommitAuthor, Release, ReleaseCommit
+)
 
 
 class ReleaseHook(object):
     def __init__(self, project):
         self.project = project
+
+    def _to_email(self, name):
+        return re.sub(r'[^a-zA-Z0-9\-_\.]*', '', name).lower() + '@localhost'
 
     def start_release(self, version, **values):
         values.setdefault('date_started', timezone.now())
@@ -26,6 +34,48 @@ class ReleaseHook(object):
             project=self.project,
             values=values,
         )
+
+    def set_commits(self, version, commit_list):
+        """
+        Commits should be ordered oldest to newest.
+
+        Calling this method will remove all existing commit history.
+        """
+        project = self.project
+        release = Release.objects.get_or_create(
+            project=project,
+            version=version,
+        )[0]
+
+        with transaction.atomic():
+            ReleaseCommit.objects.filter(
+                release=release,
+            ).delete()
+
+            authors = {}
+            for idx, data in enumerate(commit_list):
+                author = CommitAuthor.objects.get_or_create(
+                    project=project,
+                    email=data.get('author_email') or self._to_email(data['author_name']),
+                    defaults={
+                        'name': data.get('author_name'),
+                    }
+                )[0]
+
+                commit = Commit.objects.get_or_create(
+                    project=project,
+                    key=data['id'],
+                    defaults={
+                        'message': data['message'],
+                        'author': author,
+                    }
+                )[0]
+
+                ReleaseCommit.objects.create(
+                    release=release,
+                    commit=commit,
+                    order=idx,
+                )
 
     def finish_release(self, version, **values):
         values.setdefault('date_released', timezone.now())
