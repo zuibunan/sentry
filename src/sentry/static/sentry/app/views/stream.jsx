@@ -481,7 +481,7 @@ const Stream = React.createClass({
     this.history.pushState(null, path, queryParams);
   },
 
-  renderGroupNodes(ids, statsPeriod) {
+  renderGroupNodes(ids, stat, statsPeriod) {
     let {orgId, projectId} = this.props.params;
     let groupNodes = ids.map((id) => {
       return (
@@ -490,6 +490,7 @@ const Stream = React.createClass({
           id={id}
           orgId={orgId}
           projectId={projectId}
+          stat={stat}
           statsPeriod={statsPeriod} />
       );
     });
@@ -542,7 +543,7 @@ const Stream = React.createClass({
     } else if (!project.firstEvent) {
       body = this.renderAwaitingEvents();
     } else if (this.state.groupIds.length > 0) {
-      body = this.renderGroupNodes(this.state.groupIds, this.state.statsPeriod);
+      body = this.renderGroupNodes(this.state.groupIds, this.state.stat, this.state.statsPeriod);
     } else {
       body = this.renderEmpty();
     }

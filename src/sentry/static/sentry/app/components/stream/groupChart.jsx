@@ -9,6 +9,7 @@ import {valueIsEqual} from '../../utils';
 const GroupChart = React.createClass({
   propTypes: {
     id: React.PropTypes.string.isRequired,
+    stat: React.PropTypes.string.isRequired,
     statsPeriod: React.PropTypes.string.isRequired,
   },
 
@@ -65,7 +66,7 @@ const GroupChart = React.createClass({
 
     return (
       <LazyLoad>
-        <BarChart points={chartData} className="sparkline" />
+        <BarChart points={chartData} label={this.props.stat} className="sparkline" />
       </LazyLoad>
     );
   }
