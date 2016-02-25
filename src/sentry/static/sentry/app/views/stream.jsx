@@ -41,6 +41,7 @@ const Stream = React.createClass({
     return {
       defaultQuery: null,
       defaultSort: 'date',
+      defaultStat: 'events',
       defaultStatsPeriod: '24h',
       maxItems: 25
     };
@@ -58,6 +59,7 @@ const Stream = React.createClass({
       selectAllActive: false,
       multiSelected: false,
       anySelected: false,
+      stat: this.props.defaultStat,
       statsPeriod: this.props.defaultStatsPeriod,
       realtimeActive: Cookies.get('realtimeActive') === 'true',
       pageLinks: '',
@@ -230,6 +232,11 @@ const Stream = React.createClass({
       currentQuery.sort :
       this.props.defaultSort;
 
+    let stat =
+      currentQuery.hasOwnProperty('stat') ?
+      currentQuery.stat :
+      this.props.defaultStat;
+
     let statsPeriod =
       currentQuery.hasOwnProperty('statsPeriod') ?
       currentQuery.statsPeriod :
@@ -241,6 +248,7 @@ const Stream = React.createClass({
 
     let newState = {
       sort: sort,
+      stat: stat,
       statsPeriod: statsPeriod,
       query: hasQuery ? currentQuery.query : '',
       searchId: searchId,
@@ -294,6 +302,7 @@ const Stream = React.createClass({
       query: this.state.query,
       limit: this.props.maxItems,
       sort: this.state.sort,
+      stat: this.state.stat,
       statsPeriod: this.state.statsPeriod
     };
 
@@ -454,6 +463,10 @@ const Stream = React.createClass({
 
     if (this.state.sort !== this.props.defaultSort) {
       queryParams.sort = this.state.sort;
+    }
+
+    if (this.state.stat !== this.props.defaultStat) {
+      queryParams.stat = this.state.stat;
     }
 
     if (this.state.statsPeriod !== this.props.defaultStatsPeriod) {
