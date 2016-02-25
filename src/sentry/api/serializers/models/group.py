@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function
 
+import functools
 from collections import namedtuple
 from datetime import timedelta
 from django.core.urlresolvers import reverse
@@ -146,15 +147,28 @@ StatsPeriod = namedtuple('StatsPeriod', ('segments', 'interval'))
 
 
 class StreamGroupSerializer(GroupSerializer):
+    STAT_CHOICES = {
+        'events': functools.partial(
+            tsdb.get_range,
+            tsdb.models.group,
+        ),
+        'users': functools.partial(
+            tsdb.get_distinct_counts_series,
+            tsdb.models.users_affected_by_group,
+        ),
+    }
+
     STATS_PERIOD_CHOICES = {
         '14d': StatsPeriod(14, timedelta(hours=24)),
         '24h': StatsPeriod(24, timedelta(hours=1)),
     }
 
-    def __init__(self, stats_period=None):
+    def __init__(self, stat='events', stats_period=None):
+        assert stat in self.STAT_CHOICES
         if stats_period is not None:
             assert stats_period in self.STATS_PERIOD_CHOICES
 
+        self.stat = stat
         self.stats_period = stats_period
 
     def get_attrs(self, item_list, user):
@@ -166,9 +180,8 @@ class StreamGroupSerializer(GroupSerializer):
         if self.stats_period:
             segments, interval = self.STATS_PERIOD_CHOICES[self.stats_period]
             now = timezone.now()
-            stats = tsdb.get_range(
-                model=tsdb.models.group,
-                keys=group_ids,
+            stats = self.STAT_CHOICES[self.stat](
+                group_ids,
                 end=now,
                 start=now - ((segments - 1) * interval),
                 rollup=int(interval.total_seconds()),

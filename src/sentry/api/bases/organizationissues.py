@@ -30,6 +30,11 @@ class OrganizationIssuesEndpoint(OrganizationMemberEndpoint):
             # disable stats
             stats_period = None
 
+        serializer = StreamGroupSerializer(
+            stat=request.GET.get('stat', 'events'),
+            stats_period=stats_period,
+        )
+
         project_list = Project.objects.filter(
             organization=organization,
             team__in=OrganizationMemberTeam.objects.filter(
@@ -52,13 +57,11 @@ class OrganizationIssuesEndpoint(OrganizationMemberEndpoint):
             queryset=queryset,
             order_by='-sort_by',
             paginator_cls=OffsetPaginator,
-            on_results=lambda x: self._on_results(request, x, stats_period),
+            on_results=lambda x: self._on_results(request, x, serializer),
         )
 
-    def _on_results(self, request, results, stats_period):
-        results = serialize(results, request.user, StreamGroupSerializer(
-            stats_period=stats_period,
-        ))
+    def _on_results(self, request, results, serializer):
+        results = serialize(results, request.user, serializer)
 
         if request.GET.get('status') == 'unresolved':
             results = [

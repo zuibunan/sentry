@@ -177,6 +177,11 @@ class ProjectGroupIndexEndpoint(ProjectEndpoint):
             # disable stats
             stats_period = None
 
+        serializer = StreamGroupSerializer(
+            stat=request.GET.get('stat', 'events'),
+            stats_period=stats_period
+        )
+
         query = request.GET.get('query')
         if query and len(query) == 32:
             # check to see if we've got an event ID
@@ -189,11 +194,7 @@ class ProjectGroupIndexEndpoint(ProjectEndpoint):
                 pass
             else:
                 matching_group = Group.objects.get(id=mapping.group_id)
-                return Response(serialize(
-                    [matching_group], request.user, StreamGroupSerializer(
-                        stats_period=stats_period
-                    )
-                ))
+                return Response(serialize([matching_group], request.user, serializer))
 
         try:
             query_kwargs = self._build_query_params_from_request(request, project)
@@ -204,11 +205,7 @@ class ProjectGroupIndexEndpoint(ProjectEndpoint):
 
         results = list(cursor_result)
 
-        context = serialize(
-            results, request.user, StreamGroupSerializer(
-                stats_period=stats_period
-            )
-        )
+        context = serialize(results, request.user, serializer)
 
         # HACK: remove auto resolved entries
         if query_kwargs.get('status') == GroupStatus.UNRESOLVED:
