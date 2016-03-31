@@ -82,6 +82,37 @@ options_mapper = {
 }
 
 
+def load_options_from_file(path):
+    """
+    Loads YAML configuration from path.
+    """
+    options = {}
+
+    # Attempt to load our config yaml file
+    from sentry.utils.yaml import safe_load
+    from yaml.parser import ParserError
+    from yaml.scanner import ScannerError
+    try:
+        with open(path, 'rb') as fp:
+            options = safe_load(fp)
+    except IOError:
+        # Gracefully fail if yaml file doesn't exist
+        pass
+    except (AttributeError, ParserError, ScannerError) as e:
+        from .importer import ConfigurationError
+        raise ConfigurationError('Malformed config.yml file: %s' % unicode(e))
+
+    # Empty options file, so fail gracefully
+    if options is None:
+        options = {}
+    # Options needs to be a dict
+    elif not isinstance(options, dict):
+        from .importer import ConfigurationError
+        raise ConfigurationError('Malformed config.yml file')
+
+    return options
+
+
 def bootstrap_options(settings, config=None):
     """
     Quickly bootstrap options that come in from a config file
@@ -92,29 +123,7 @@ def bootstrap_options(settings, config=None):
     from sentry.options import load_defaults
     load_defaults()
 
-    options = {}
-    if config is not None:
-        # Attempt to load our config yaml file
-        from sentry.utils.yaml import safe_load
-        from yaml.parser import ParserError
-        from yaml.scanner import ScannerError
-        try:
-            with open(config, 'rb') as fp:
-                options = safe_load(fp)
-        except IOError:
-            # Gracefully fail if yaml file doesn't exist
-            pass
-        except (AttributeError, ParserError, ScannerError) as e:
-            from .importer import ConfigurationError
-            raise ConfigurationError('Malformed config.yml file: %s' % unicode(e))
-
-        # Empty options file, so fail gracefully
-        if options is None:
-            options = {}
-        # Options needs to be a dict
-        elif not isinstance(options, dict):
-            from .importer import ConfigurationError
-            raise ConfigurationError('Malformed config.yml file')
+    options = load_options_from_file(config) if config is not None else {}
 
     from sentry.conf.server import DEAD
 
