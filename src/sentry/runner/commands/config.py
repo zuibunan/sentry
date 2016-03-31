@@ -7,6 +7,8 @@ sentry.runner.commands.config
 """
 from __future__ import absolute_import, print_function
 
+import itertools
+
 import click
 from sentry.runner.decorators import configuration
 
@@ -83,6 +85,50 @@ def delete(option, no_input):
         options.delete(option)
     except UnknownOption:
         raise click.ClickException('unknown option: %s' % option)
+
+
+@config.command()
+def migrate():
+    # XXX: Note that this does **not** have the `configuration` decorator,
+    # since it requires the settings to not already be patched.
+    from sentry.runner.settings import discover_configs, load_django_settings
+
+    _, py, yaml = discover_configs()
+
+    settings = load_django_settings(py)
+
+    from sentry.conf.server import DEAD
+    from sentry.options import load_defaults
+    from sentry.runner.initializer import (
+        load_options_from_file,
+        forward_options_mapper,
+        writeback_options_mapper,
+    )
+
+    load_defaults()
+
+    options = load_options_from_file(yaml)
+
+    options_mapper = itertools.chain(
+        forward_options_mapper.iteritems(),
+        writeback_options_mapper.iteritems(),
+    )
+
+    migrated = {}
+    for configuration_key, setting_name in options_mapper:
+        value = getattr(settings, setting_name, DEAD)
+        if value is not DEAD and configuration_key not in options:
+            migrated[configuration_key] = (setting_name, value)
+
+    import yaml
+
+    # TODO: Actually append these to the source files.
+
+    for key, (setting_name, value) in sorted(migrated.items()):
+        print('# This setting was automatically migrated from {}.'.format(setting_name))
+        print(yaml.safe_dump({key: value}, default_flow_style=False))
+
+    # TODO: Handle Redis.
 
 
 @config.command(name='generate-secret-key')

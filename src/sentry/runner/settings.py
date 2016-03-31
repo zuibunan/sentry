@@ -279,6 +279,21 @@ def discover_configs():
     )
 
 
+def load_django_settings(path):
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'sentry_config'
+
+    from .importer import install
+
+    install('sentry_config', path, DEFAULT_SETTINGS_MODULE)
+
+    # HACK: we need to force access of django.conf.settings to
+    # ensure we don't hit any import-driven recursive behavior
+    from django.conf import settings
+    hasattr(settings, 'INSTALLED_APPS')
+
+    return settings
+
+
 def configure(ctx, py, yaml, skip_backend_validation=False):
     """
     Given the two different config files, set up the environment.
@@ -307,8 +322,6 @@ def configure(ctx, py, yaml, skip_backend_validation=False):
     ):
         mimetypes.add_type(type, '.' + ext)
 
-    from .importer import install
-
     if yaml is None:
         # `yaml` will be None when SENTRY_CONF is pointed
         # directly to a file, in which case, this file must exist
@@ -332,14 +345,7 @@ def configure(ctx, py, yaml, skip_backend_validation=False):
             else:
                 filemon(yaml)(uwsgi.reload)
 
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'sentry_config'
-
-    install('sentry_config', py, DEFAULT_SETTINGS_MODULE)
-
-    # HACK: we need to force access of django.conf.settings to
-    # ensure we don't hit any import-driven recursive behavior
-    from django.conf import settings
-    hasattr(settings, 'INSTALLED_APPS')
+    settings = load_django_settings(py)
 
     from .initializer import initialize_app, on_configure
     initialize_app({
