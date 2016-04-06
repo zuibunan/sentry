@@ -926,7 +926,6 @@ SENTRY_ROLES = (
 
 # See sentry/options/__init__.py for more information
 SENTRY_OPTIONS = {}
-SENTRY_DEFAULT_OPTIONS = {}
 
 # You should not change this setting after your database has been created
 # unless you have altered all schemas first

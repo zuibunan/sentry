@@ -134,10 +134,14 @@ def bootstrap_options(settings, config=None):
     for k, v in options.iteritems():
         settings.SENTRY_OPTIONS[k] = v
 
+    from sentry.options import default_manager
+
+    defaults = {name: key.default() for name, key in default_manager.registry.iteritems()}
+
     # Now go back through all of SENTRY_OPTIONS and promote
     # back into settings. This catches the case when values are defined
     # only in SENTRY_OPTIONS and no config.yml file
-    for o in (settings.SENTRY_DEFAULT_OPTIONS, settings.SENTRY_OPTIONS):
+    for o in (defaults, settings.SENTRY_OPTIONS):
         for k, v in o.iteritems():
             if k in options_mapper:
                 # Map the mail.backend aliases to something Django understands
@@ -324,8 +328,10 @@ def apply_legacy_settings(settings):
         warnings.warn(DeprecatedSettingWarning('SENTRY_ALLOW_REGISTRATION', 'SENTRY_FEATURES["auth:register"]'))
         settings.SENTRY_FEATURES['auth:register'] = settings.SENTRY_ALLOW_REGISTRATION
 
+    from sentry.options import default_manager
+
     settings.DEFAULT_FROM_EMAIL = settings.SENTRY_OPTIONS.get(
-        'mail.from', settings.SENTRY_DEFAULT_OPTIONS.get('mail.from'))
+        'mail.from', default_manager.lookup_key('mail.from').default())
 
 
 def skip_migration_if_applied(settings, app_name, table_name,

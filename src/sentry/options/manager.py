@@ -162,10 +162,7 @@ class OptionsManager(object):
             # default to the hardcoded local configuration for this key
             return settings.SENTRY_OPTIONS[key]
         except KeyError:
-            try:
-                return settings.SENTRY_DEFAULT_OPTIONS[key]
-            except KeyError:
-                return opt.default()
+            return opt.default()
 
     def delete(self, key):
         """
@@ -227,8 +224,6 @@ class OptionsManager(object):
         # would be treated as a not valid value
         if default_value is True or default_value is False:
             flags |= FLAG_ALLOW_EMPTY
-
-        settings.SENTRY_DEFAULT_OPTIONS[key] = default_value
 
         self.registry[key] = self.store.make_key(key, default, type, flags, ttl, grace)
 

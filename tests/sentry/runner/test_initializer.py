@@ -15,7 +15,6 @@ def settings():
     s.ALLOWED_HOSTS = []
     s.SENTRY_FEATURES = {}
     s.SENTRY_OPTIONS = {}
-    s.SENTRY_DEFAULT_OPTIONS = {}
     s.SENTRY_EMAIL_BACKEND_ALIASES = {'dummy': 'alias-for-dummy'}
     return s
 
