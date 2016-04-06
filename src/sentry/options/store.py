@@ -14,7 +14,6 @@ from random import random
 
 from django.utils import timezone
 from django.utils.functional import cached_property
-from sentry.db.models.query import create_or_update
 from sentry.utils.hashlib import md5
 
 
@@ -194,6 +193,8 @@ class OptionsStore(object):
         return self.set_cache(key, value)
 
     def set_store(self, key, value):
+        # XXX: `create_or_update` causes settings to be imported.
+        from sentry.db.models.query import create_or_update
         create_or_update(
             model=self.model,
             key=key.name,

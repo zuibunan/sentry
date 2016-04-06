@@ -39,6 +39,11 @@ logger = logging.getLogger(__name__)
 
 SMTP_HOSTNAME = getattr(settings, 'SENTRY_SMTP_HOSTNAME', 'localhost')
 ENABLE_EMAIL_REPLIES = getattr(settings, 'SENTRY_ENABLE_EMAIL_REPLIES', False)
+EMAIL_BACKEND_ALIASES = {
+    'smtp': 'django.core.mail.backends.smtp.EmailBackend',
+    'dummy': 'django.core.mail.backends.dummy.EmailBackend',
+    'console': 'django.core.mail.backends.console.EmailBackend',
+}
 
 
 class _CaseInsensitiveSigner(Signer):
@@ -363,10 +368,7 @@ def send_messages(messages, fail_silently=False):
 
 def get_mail_backend():
     backend = options.get('mail.backend')
-    try:
-        return settings.SENTRY_EMAIL_BACKEND_ALIASES[backend]
-    except KeyError:
-        return backend
+    return EMAIL_BACKEND_ALIASES.get(backend, backend)
 
 
 def get_connection(fail_silently=False):

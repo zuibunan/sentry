@@ -82,7 +82,7 @@ options_mapper = {
 }
 
 
-def bootstrap_options(settings, config=None):
+def bootstrap_options(options_file_path, settings):
     """
     Quickly bootstrap options that come in from a config file
     and convert options into Django settings that are
@@ -93,13 +93,13 @@ def bootstrap_options(settings, config=None):
     load_defaults()
 
     options = {}
-    if config is not None:
+    if options_file_path is not None:
         # Attempt to load our config yaml file
         from sentry.utils.yaml import safe_load
         from yaml.parser import ParserError
         from yaml.scanner import ScannerError
         try:
-            with open(config, 'rb') as fp:
+            with open(options_file_path, 'rb') as fp:
                 options = safe_load(fp)
         except IOError:
             # Gracefully fail if yaml file doesn't exist
@@ -129,35 +129,73 @@ def bootstrap_options(settings, config=None):
             )
             options[k] = getattr(settings, v)
 
+    # XXX: This really should be state that is bound to the options manager,
+    # not global settings.
     # Stuff everything else into SENTRY_OPTIONS
     # these will be validated later after bootstrapping
     for k, v in options.iteritems():
         settings.SENTRY_OPTIONS[k] = v
 
     from sentry.options import default_manager
-
-    defaults = {name: key.default() for name, key in default_manager.registry.iteritems()}
-
-    # Now go back through all of SENTRY_OPTIONS and promote
-    # back into settings. This catches the case when values are defined
-    # only in SENTRY_OPTIONS and no config.yml file
-    for o in (defaults, settings.SENTRY_OPTIONS):
-        for k, v in o.iteritems():
-            if k in options_mapper:
-                # Map the mail.backend aliases to something Django understands
-                if k == 'mail.backend':
-                    try:
-                        v = settings.SENTRY_EMAIL_BACKEND_ALIASES[v]
-                    except KeyError:
-                        pass
-                # Escalate the few needed to actually get the app bootstrapped into settings
-                setattr(settings, options_mapper[k], v)
+    return default_manager
 
 
-def initialize_app(config, skip_backend_validation=False):
-    settings = config['settings']
+class SettingsProxy(object):
+    def __init__(self, accessors, settings):
+        self.accessors = accessors
+        self.settings = settings
 
-    bootstrap_options(settings, config['options'])
+    def __getattr__(self, name):
+        accessor = self.accessors.get(name)
+        if accessor is not None:
+            return accessor()
+
+        return getattr(self.settings, name)
+
+
+def initialize_app(options_file_path, skip_backend_validation=False):
+    import os
+    from django.conf import ENVIRONMENT_VARIABLE, Settings, settings
+
+    # Load (but don't install) the base Django settings file.
+    base_settings = Settings(os.environ[ENVIRONMENT_VARIABLE])
+
+    # Set up the options system. (The base settings are used to forward some
+    # settings that were moved to options for backwards compatibility.)
+    options = bootstrap_options(options_file_path, base_settings)
+
+    def get_option_value(name):
+        return lambda: options.get(name)
+
+    def get_aliased_option_value(name, aliases):
+        def get_option_value():
+            value = options.get(name)
+            return aliases.get(value, value)
+        return get_option_value
+
+    proxy = SettingsProxy({
+        'EMAIL_BACKEND': get_aliased_option_value(
+            'mail.backend', {
+                'smtp': 'django.core.mail.backends.smtp.EmailBackend',
+                'dummy': 'django.core.mail.backends.dummy.EmailBackend',
+                'console': 'django.core.mail.backends.console.EmailBackend',
+            }
+        ),
+        'EMAIL_HOST': get_option_value('mail.host'),
+        'EMAIL_HOST_PASSWORD': get_option_value('mail.password'),
+        'EMAIL_HOST_USER': get_option_value('mail.username'),
+        'EMAIL_PORT': get_option_value('mail.port'),
+        'EMAIL_SUBJECT_PREFIX': get_option_value('mail.subject-prefix'),
+        'EMAIL_USE_TLS': get_option_value('mail.use-tls'),
+        'SECRET_KEY': get_option_value('system.secret-key'),
+        'SERVER_EMAIL': get_option_value('mail.from'),
+    }, base_settings)
+
+    # Install the Django settings using the options wrapper. This allows us to
+    # provide backwards compatibility for settings that were moved to options,
+    # but still required for Django compatibility (e.g. SMTP settings provided
+    # to the SMTP mail backend.)
+    settings.configure(proxy)
 
     fix_south(settings)
 
@@ -359,14 +397,13 @@ def skip_migration_if_applied(settings, app_name, table_name,
         skip_if_table_exists(migration.forwards), migration)
 
 
-def on_configure(config):
+def on_configure():
     """
     Executes after settings are full installed and configured.
 
     At this point we can force import on various things such as models
     as all of settings should be correctly configured.
     """
-    settings = config['settings']
+    from django.conf import settings
 
-    skip_migration_if_applied(
-        settings, 'social_auth', 'social_auth_association')
+    skip_migration_if_applied(settings, 'social_auth', 'social_auth_association')

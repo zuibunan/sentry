@@ -10,6 +10,8 @@ from __future__ import absolute_import, print_function
 import os
 import click
 
+from django.conf import ENVIRONMENT_VARIABLE
+
 
 DEFAULT_SETTINGS_MODULE = 'sentry.conf.server'
 DEFAULT_SETTINGS_CONF = 'config.yml'
@@ -319,22 +321,13 @@ def configure(ctx, py, yaml, skip_backend_validation=False):
             else:
                 filemon(yaml)(uwsgi.reload)
 
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'sentry_config'
+    os.environ[ENVIRONMENT_VARIABLE] = 'sentry_config'
 
     install('sentry_config', py, DEFAULT_SETTINGS_MODULE)
 
-    # HACK: we need to force access of django.conf.settings to
-    # ensure we don't hit any import-driven recursive behavior
-    from django.conf import settings
-    hasattr(settings, 'INSTALLED_APPS')
-
     from .initializer import initialize_app, on_configure
-    initialize_app({
-        'config_path': py,
-        'settings': settings,
-        'options': yaml,
-    }, skip_backend_validation=skip_backend_validation)
-    on_configure({'settings': settings})
+    initialize_app(yaml, skip_backend_validation=skip_backend_validation)
+    on_configure()
 
     __installed = True
 

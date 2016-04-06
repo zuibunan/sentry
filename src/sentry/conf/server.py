@@ -708,12 +708,6 @@ SENTRY_INTERFACES = {
     'sentry.interfaces.Breadcrumbs': 'sentry.interfaces.breadcrumbs.Breadcrumbs',
 }
 
-SENTRY_EMAIL_BACKEND_ALIASES = {
-    'smtp': 'django.core.mail.backends.smtp.EmailBackend',
-    'dummy': 'django.core.mail.backends.dummy.EmailBackend',
-    'console': 'django.core.mail.backends.console.EmailBackend',
-}
-
 # set of backends that do not support needing SMTP mail.* settings
 # This list is a bit fragile and hardcoded, but it's unlikely that
 # a user will be using a different backend that also mandates SMTP
