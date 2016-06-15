@@ -115,5 +115,8 @@ class ProjectUserReportsEndpoint(ProjectEndpoint):
                 comments=report.comments,
                 date_added=timezone.now(),
             )
+        else:
+            if report.group:
+                report.notify()
 
         return Response(serialize(report, request.user, ProjectUserReportSerializer()))
