@@ -587,8 +587,8 @@ const Stream = React.createClass({
               isSearchDisabled={this.state.isSidebarVisible}
               savedSearchList={this.state.savedSearchList}
             />
-            <div className="group-header">
-              <Sticky onStickyStateChange={this.onStickyStateChange}>
+            <Sticky onStickyStateChange={this.onStickyStateChange}>
+              <div className="group-header">
                 <div className={this.state.isStickyHeader ? 'container' : null}>
                   <StreamActions
                     orgId={params.orgId}
@@ -601,8 +601,8 @@ const Stream = React.createClass({
                     groupIds={this.state.groupIds}
                     allResultsVisible={this.allResultsVisible()}/>
                 </div>
-              </Sticky>
-            </div>
+              </div>
+            </Sticky>
             {this.renderStreamBody()}
             <Pagination pageLinks={this.state.pageLinks}/>
           </div>
