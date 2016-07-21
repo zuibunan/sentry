@@ -103,6 +103,11 @@ def subtract(value, amount):
 
 
 @register.filter
+def absolute_value(value):
+    return abs(int(value) if isinstance(value, (int, long)) else float(value))
+
+
+@register.filter
 def has_charts(group):
     from sentry.utils.db import has_charts
     if hasattr(group, '_state'):
@@ -118,7 +123,7 @@ def as_sorted(value):
 
 
 @register.filter
-def small_count(v):
+def small_count(v, precision=1):
     if not v:
         return 0
     z = [
@@ -132,7 +137,7 @@ def small_count(v):
         if o:
             if len(str(o)) > 2 or not p:
                 return '%d%s' % (o, y)
-            return '%.1f%s' % (v / float(x), y)
+            return ('%.{}f%s'.format(precision)) % (v / float(x), y)
     return v
 
 
@@ -372,11 +377,18 @@ def render_tag_widget(group, tag):
     }
 
 
-@register.simple_tag
-def percent(value, total):
+@register.simple_tag(takes_context=True)
+def percent(context, value, total, varname=None):
     if not (value and total):
-        return 0
-    return int(int(value) / float(total) * 100)
+        result = 0
+    else:
+        result = int(int(value) / float(total) * 100)
+
+    if varname:
+        context[varname] = result
+        return ''
+    else:
+        return result
 
 
 @register.filter
