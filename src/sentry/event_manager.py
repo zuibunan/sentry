@@ -28,8 +28,9 @@ from sentry.constants import (
 )
 from sentry.interfaces.base import get_interface
 from sentry.models import (
-    Activity, Event, EventMapping, EventUser, Group, GroupHash, GroupRelease,
-    GroupResolution, GroupStatus, Project, Release, TagKey, UserReport
+    Activity, Environment, Event, EventMapping, EventUser, Group, GroupHash,
+    GroupRelease, GroupResolution, GroupStatus, Project, Release,
+    ReleaseEnvironment, TagKey, UserReport
 )
 from sentry.plugins import plugins
 from sentry.signals import first_event_received, regression_signal
@@ -392,7 +393,6 @@ class EventManager(object):
 
         return data
 
-    @suppress_exceptions
     def save(self, project, raw=False):
         from sentry.tasks.post_process import index_event_tags
 
@@ -562,7 +562,19 @@ class EventManager(object):
                              exc_info=True)
             return event
 
+        environment = Environment.get_or_create(
+            project=project,
+            name=environment,
+        )
+
         if release:
+            ReleaseEnvironment.get_or_create(
+                project=project,
+                release=release,
+                environment=environment,
+                datetime=date,
+            )
+
             grouprelease = GroupRelease.get_or_create(
                 group=group,
                 release=release,
